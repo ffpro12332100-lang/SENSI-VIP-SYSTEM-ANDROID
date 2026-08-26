@@ -121,7 +121,7 @@ const SISTEMA_CLAVES = {
     }]
 };
 
-let SERVIDOR_ACTIVO = false;
+let SERVIDOR_ACTIVO = true;
 
 const SENSI_VALORES = {
     BAJA: {
