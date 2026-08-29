@@ -203,7 +203,7 @@ function mostrarAlertaLogin(mensaje) {
     }
     if (loginCard) {
         loginCard.classList.remove('shake-effect');
-        void loginCard.offsetWidth; // Forzar reflow para reiniciar la animación limpiamente
+        void loginCard.offsetWidth; // Forzar reflow
         loginCard.classList.add('shake-effect');
     }
 }
@@ -514,6 +514,59 @@ function cerrarSesion() {
     if (keyInput) keyInput.value = savedPass || '';
 }
 
+/* ==========================================================================
+   📦 GESTIÓN DE COPIA DE SEGURIDAD (EXPORTACIÓN E IMPORTACIÓN COMPLETA)
+   ========================================================================== */
+
+function obtenerObjetoCopiaSeguridad() {
+    const backupData = {};
+
+    const sysCfg = SafeStorage.getItem('ff_sys_cfg_v12');
+    if (sysCfg) backupData['ff_sys_cfg_v12'] = sysCfg;
+
+    const lockUntil = SafeStorage.getItem('svs_lock_until');
+    if (lockUntil) backupData['svs_lock_until'] = lockUntil;
+
+    const savedPass = SafeStorage.getItem('svs_saved_password');
+    if (savedPass) backupData['svs_saved_password'] = savedPass;
+
+    const activeSession = SafeStorage.getItem('svs_active_session');
+    if (activeSession) backupData['svs_active_session'] = activeSession;
+
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('svs_pass_exp_')) {
+                const val = localStorage.getItem(key);
+                if (val) backupData[key] = val;
+            }
+        }
+    } catch (e) {}
+
+    return backupData;
+}
+
+function exportarCopiaSeguridadJSON() {
+    return JSON.stringify(obtenerObjetoCopiaSeguridad());
+}
+
+function restaurarCopiaSeguridad(datos) {
+    if (!datos) return false;
+    try {
+        const obj = typeof datos === 'string' ? JSON.parse(datos) : datos;
+        if (typeof obj !== 'object' || obj === null) return false;
+
+        Object.keys(obj).forEach(key => {
+            if (key === 'ff_sys_cfg_v12' || key.startsWith('svs_')) {
+                SafeStorage.setItem(key, String(obj[key]));
+            }
+        });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 const JavaBridge = {
     enviar: function(action, payload) {
         try {
@@ -542,6 +595,12 @@ window.recibirDeJava = function(jsonString) {
         if (data.action === 'generarSensibilidad') ejecutarBotonGenerar();
         else if (data.action === 'cargarConfiguracion') window.configurarDesdeJava(data.config);
         else if (data.action === 'setServerStatus') setEstadoServidor(!!data.active);
+        else if (data.action === 'obtenerCopiaSeguridad') {
+            JavaBridge.enviar('copiaSeguridadGenerada', obtenerObjetoCopiaSeguridad());
+        }
+        else if (data.action === 'restaurarCopiaSeguridad') {
+            restaurarCopiaSeguridad(data.payload);
+        }
     } catch (e) {}
 };
 
@@ -691,11 +750,9 @@ function ejecutarVibracion() {
     }
 }
 
-/* Tono de audio ajustado a 90ms con volumen corregido (amplificado 50%+ para mayor presencia) */
 function ejecutarSonidoUI(tipo) {
     if (!appConfig.sound) return;
 
-    // Control anti-saturación para evitar solapamientos cuando hay varios disparadores de eventos
     const ahoraMs = Date.now();
     if (ahoraMs - ultimoSonidoTiempo < 40) return;
     ultimoSonidoTiempo = ahoraMs;
@@ -713,7 +770,6 @@ function ejecutarSonidoUI(tipo) {
         osc.frequency.setValueAtTime((tipo === 'gen') ? 650 : 880, now);
         osc.frequency.exponentialRampToValueAtTime(320, now + duracion);
 
-        // Volumen incrementado a 0.095 (más del 50% de ganancia extra respecto al valor original 0.04)
         gain.gain.setValueAtTime(0.095, now);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duracion);
 
@@ -757,7 +813,6 @@ let deltaIndex = 0;
 let isBatterySaverActive = false;
 let monitorFrameId = null;
 
-/* Ajuste de frecuencia a 400ms para evitar parpadeos y permitir lectura humana clara de FPS/CPU/GPU */
 function monitorPerformanceLoop(now) {
     if (isBatterySaverActive || document.hidden) {
         monitorFrameId = null;
@@ -922,7 +977,6 @@ window.addEventListener('DOMContentLoaded', () => {
     verificarEstadoBloqueo();
     setEstadoServidor(SERVIDOR_ACTIVO);
 
-    /* --- REGISTRO UNIVERSAL DE SONIDO DE CLIC/TOQUE PARA CUALQUIER BOTÓN O ELEMENTO PULSABLE --- */
     document.addEventListener('click', function(e) {
         const target = e.target.closest('button, input, select, label, a, option, [onclick], .btn, .card, .toggle, .checkbox-container, .modal-close, [role="button"]');
         if (target) {
@@ -1004,12 +1058,16 @@ function guardarConfiguracion() {
     SafeStorage.setItem('ff_sys_cfg_v12', JSON.stringify(payloadData));
     toggleModal(false);
 
-    JavaBridge.enviar('configuracionGuardada', payloadData);
+    const backupCompleto = obtenerObjetoCopiaSeguridad();
+
+    JavaBridge.enviar('configuracionGuardada', {
+        config: payloadData,
+        backupData: backupCompleto
+    });
 }
 
 let loaderInterval = null;
 
-/* ANIMACIÓN MEJORADA: Carga progresiva de ~1.8s con pasos visuales legibles */
 function iniciarCarga(alFinalizar) {
     if (loaderInterval) clearInterval(loaderInterval);
     let progreso = 0;
@@ -1046,7 +1104,6 @@ function iniciarCarga(alFinalizar) {
     if (loaderProgressBarFill) loaderProgressBarFill.style.width = '0%';
 
     loaderInterval = setInterval(() => {
-        // Incremento suavizado entre +2% y +4% cada 35ms (Duración total ~1.8 segundos)
         const incremento = Math.floor(Math.random() * 3) + 2;
         progreso += incremento;
         const pVal = Math.min(100, progreso);
@@ -1058,7 +1115,6 @@ function iniciarCarga(alFinalizar) {
         if (progreso >= 100) {
             clearInterval(loaderInterval);
             loaderInterval = null;
-            // Retención de 350ms al 100% para que el ojo perciba la barra totalmente completa
             setTimeout(() => {
                 if (loaderModal) loaderModal.style.display = 'none';
                 if (typeof alFinalizar === 'function') alFinalizar();
