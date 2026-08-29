@@ -1,6 +1,6 @@
 /* --- SEGURIDAD Y BLOQUEO ANTI-INSPECCIÓN --- */
 (function() {
-    'use strict';
+    'usestrict';
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         return false;
@@ -473,7 +473,8 @@ function completarLoginExitoso(resultado, keyVal, expiresAt) {
     const alertBox = document.getElementById('loginAlertBox');
     if (alertBox) alertBox.style.display = 'none';
 
-    iniciarCarga(() => {
+    /* ANIMACIÓN ESPECÍFICA PARA LOGIN */
+    iniciarCargaLogin(() => {
         const loginCard = document.getElementById('loginCard');
         const mainApp = document.getElementById('mainApp');
 
@@ -987,8 +988,27 @@ window.addEventListener('DOMContentLoaded', () => {
     const loginCard = document.getElementById('loginCard');
     const mainApp = document.getElementById('mainApp');
 
-    if (loginCard) loginCard.style.display = 'flex';
-    if (mainApp) mainApp.style.display = 'none';
+    /* Mantiene las credenciales guardadas si existe una sesión activa */
+    const savedSession = SafeStorage.getItem('svs_active_session');
+    if (savedSession) {
+        try {
+            const parsedSession = JSON.parse(savedSession);
+            if (parsedSession && parsedSession.esValida) {
+                if (loginCard) loginCard.style.display = 'none';
+                if (mainApp) mainApp.style.display = 'block';
+                iniciarTemporizadorEnTiempoReal(parsedSession);
+            } else {
+                if (loginCard) loginCard.style.display = 'flex';
+                if (mainApp) mainApp.style.display = 'none';
+            }
+        } catch (e) {
+            if (loginCard) loginCard.style.display = 'flex';
+            if (mainApp) mainApp.style.display = 'none';
+        }
+    } else {
+        if (loginCard) loginCard.style.display = 'flex';
+        if (mainApp) mainApp.style.display = 'none';
+    }
 
     const savedPass = SafeStorage.getItem('svs_saved_password');
     const keyInput = document.getElementById('loginKey');
@@ -1068,6 +1088,63 @@ function guardarConfiguracion() {
 
 let loaderInterval = null;
 
+/* ANIMACIÓN ESPECÍFICA PARA EL INICIO DE SESIÓN */
+function iniciarCargaLogin(alFinalizar) {
+    if (loaderInterval) clearInterval(loaderInterval);
+    let progreso = 0;
+
+    const loaderModal = DOM.loaderModal || document.getElementById('loaderModal');
+    const loaderStatusText = DOM.loaderStatusText || document.getElementById('loaderStatusText');
+    const loaderPercentText = DOM.loaderPercentText || document.getElementById('loaderPercentText');
+    const loaderProgressBarFill = DOM.loaderProgressBarFill || document.getElementById('loaderProgressBarFill');
+
+    if (loaderModal) {
+        loaderModal.style.display = 'flex';
+        loaderModal.style.opacity = '1';
+    }
+
+    const estadosTextoLogin = [
+        { min: 0, texto: '🔑 VERIFICANDO CREDENCIALES...' },
+        { min: 30, texto: '🌐 CONECTANDO AL SERVIDOR VIP...' },
+        { min: 70, texto: '🔓 VALIDANDO LICENCIA Y TIEMPO...' },
+        { min: 95, texto: '✅ ACCESO CONCEDIDO' }
+    ];
+
+    const actualizarTextoEtapa = (p) => {
+        if (!loaderStatusText) return;
+        for (let i = estadosTextoLogin.length - 1; i >= 0; i--) {
+            if (p >= estadosTextoLogin[i].min) {
+                loaderStatusText.textContent = estadosTextoLogin[i].texto;
+                break;
+            }
+        }
+    };
+
+    actualizarTextoEtapa(0);
+    if (loaderPercentText) loaderPercentText.textContent = '0%';
+    if (loaderProgressBarFill) loaderProgressBarFill.style.width = '0%';
+
+    loaderInterval = setInterval(() => {
+        const incremento = Math.floor(Math.random() * 3) + 3;
+        progreso += incremento;
+        const pVal = Math.min(100, progreso);
+
+        if (loaderPercentText) loaderPercentText.textContent = pVal + '%';
+        if (loaderProgressBarFill) loaderProgressBarFill.style.width = pVal + '%';
+        actualizarTextoEtapa(pVal);
+
+        if (progreso >= 100) {
+            clearInterval(loaderInterval);
+            loaderInterval = null;
+            setTimeout(() => {
+                if (loaderModal) loaderModal.style.display = 'none';
+                if (typeof alFinalizar === 'function') alFinalizar();
+            }, 300);
+        }
+    }, 30);
+}
+
+/* ANIMACIÓN ESPECÍFICA PARA LA GENERACIÓN DE SENSIBILIDAD */
 function iniciarCarga(alFinalizar) {
     if (loaderInterval) clearInterval(loaderInterval);
     let progreso = 0;
