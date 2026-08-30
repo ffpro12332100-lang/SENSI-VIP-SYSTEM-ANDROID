@@ -114,10 +114,10 @@ const SISTEMA_CLAVES = {
     ADMIN: ["admin", "adminvip"],
     PERMANENTE: ["jhonatan", "jhonatanvip"],
     TEMPORALES: [{
-        clave: "SENSI_VIP_7D",
-        tipo: "7 Días",
-        mensaje: "Pase Temporal de 7 Días Activo",
-        duracionMs: 7 * 24 * 60 * 60 * 1000
+        clave: "SENSI_VIP_15D",
+        tipo: "15 Días",
+        mensaje: "Pase Temporal de 15 Días Activo",
+        duracionMs: 15 * 24 * 60 * 60 * 1000
     }]
 };
 
